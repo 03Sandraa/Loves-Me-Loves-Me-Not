@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Loves Me, Loves Me Not</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div id="app">
+  <header class="topbar">
+    <div class="gender-selector" role="group" aria-label="Pronoun">
+      <button class="gender-btn active" data-gender="She">She</button>
+      <button class="gender-btn" data-gender="He">He</button>
+      <button class="gender-btn" data-gender="They">They</button>
+    </div>
+    <div class="topbar-right">
+      <button id="muteBtn" class="icon-btn" aria-label="Mute sound" aria-pressed="false" title="Mute sound">
+        <svg viewBox="0 0 24 24" width="20" height="20" class="icon-unmuted"><path d="M4 9v6h4l5 5V4L8 9H4z" fill="currentColor"/><path d="M16.5 8.5a5 5 0 0 1 0 7" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round"/><path d="M18.8 6a8.5 8.5 0 0 1 0 12" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round" opacity="0.6"/></svg>
+        <svg viewBox="0 0 24 24" width="20" height="20" class="icon-muted"><path d="M4 9v6h4l5 5V4L8 9H4z" fill="currentColor"/><path d="M16 9l5 5M21 9l-5 5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+      </button>
+      <button id="newFlowerBtn" class="primary-btn">New flower</button>
+    </div>
+  </header>
+
+  <main id="stage">
+    <svg id="flowerSvg" viewBox="0 0 600 600" preserveAspectRatio="xMidYMid meet"></svg>
+    <div id="cornerLeft" class="message-corner message-corner--left"></div>
+    <div id="cornerRight" class="message-corner message-corner--right"></div>
+    <div id="hint" class="hint">Drag a petal away to pluck it</div>
+  </main>
+</div>
+<script src="app.js"></script>
+</body>
+</html>

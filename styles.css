@@ -1,0 +1,238 @@
+:root {
+  --bg-rest-top: #a9c1ab;
+  --bg-rest-bottom: #a3bda5;
+  --bg-yes-top: #8cb695;
+  --bg-yes-bottom: #8cb695;
+  --bg-no-top: #91a194;
+  --bg-no-bottom: #91a194;
+
+  --bg-a: var(--bg-rest-top);
+  --bg-b: var(--bg-rest-bottom);
+
+  --ink: #2f3b30;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  height: 100%;
+  margin: 0;
+  overscroll-behavior: none;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  color: var(--ink);
+  /* A soft gingham/plaid weave in the same green family as the mood color:
+     two sets of translucent white bands (one running each way) blended
+     over the base gradient. Where they cross, the extra blending creates
+     the classic checked look — subtly, since it's just tonal variation
+     within the existing green, not a separate pattern color. */
+  background-image:
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.12) 0 27px, transparent 27px 94.5px),
+    repeating-linear-gradient(180deg, rgba(255, 255, 255, 0.12) 0 27px, transparent 27px 94.5px),
+    linear-gradient(180deg, var(--bg-a) 0%, var(--bg-b) 100%);
+  background-blend-mode: soft-light, soft-light, normal;
+  transition: background-image 900ms ease;
+}
+
+#app {
+  position: relative;
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* ---------- Top bar ----------
+   Positioned as a transparent overlay above the stage (not squeezing it
+   into a shorter box) so petals thrown upward stay visible passing behind
+   it. The bar itself lets clicks through; only the actual button shapes
+   (re-enabled below) stay on top and clickable, keeping petals visually
+   and functionally behind the buttons themselves. */
+
+.topbar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 10;
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 20px;
+  flex-wrap: wrap;
+}
+
+.gender-selector {
+  display: inline-flex;
+  pointer-events: auto;
+  background: rgba(255, 255, 255, 0.35);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  border-radius: 999px;
+  padding: 4px;
+  gap: 2px;
+}
+
+.gender-btn {
+  border: none;
+  background: transparent;
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 600;
+  padding: 8px 16px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background 200ms ease, color 200ms ease, transform 150ms ease;
+}
+
+.gender-btn:hover { background: rgba(255, 255, 255, 0.35); }
+
+.gender-btn.active {
+  background: #ffffff;
+  color: #3a6b3d;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
+}
+
+.topbar-right {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  pointer-events: auto;
+}
+
+.icon-btn {
+  width: 38px;
+  height: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.35);
+  color: var(--ink);
+  cursor: pointer;
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  transition: background 200ms ease, transform 150ms ease;
+}
+
+.icon-btn:hover { background: rgba(255, 255, 255, 0.5); }
+.icon-btn:active { transform: scale(0.92); }
+
+.icon-muted { display: none; }
+.icon-btn.is-muted .icon-unmuted { display: none; }
+.icon-btn.is-muted .icon-muted { display: block; }
+
+.primary-btn {
+  border: none;
+  background: #ffffff;
+  color: #3a6b3d;
+  font-size: 14px;
+  font-weight: 700;
+  padding: 10px 20px;
+  border-radius: 999px;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+  transition: transform 150ms ease, box-shadow 150ms ease;
+}
+
+.primary-btn:hover { box-shadow: 0 4px 12px rgba(0, 0, 0, 0.16); }
+.primary-btn:active { transform: scale(0.96); }
+
+/* ---------- Stage ---------- */
+
+#stage {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  z-index: 1;
+}
+
+#flowerSvg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.petal-anchor {
+  touch-action: none;
+  transition: none;
+}
+
+.petal-anchor.snapping {
+  transition: transform 380ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.petal-shape {
+  cursor: grab;
+  filter: drop-shadow(0 4px 5px rgba(0, 0, 0, 0.14));
+  transition: filter 150ms ease;
+}
+
+.petal-shape:active { cursor: grabbing; }
+
+.petal-anchor.is-falling .petal-shape {
+  filter: drop-shadow(0 10px 12px rgba(0, 0, 0, 0.2));
+  cursor: default;
+}
+
+.center-circle {
+  pointer-events: none;
+  filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.18));
+}
+
+/* ---------- Messages ---------- */
+
+.message-corner {
+  position: absolute;
+  bottom: 28px;
+  max-width: 60%;
+  pointer-events: none;
+  z-index: 5;
+}
+
+.message-corner--left { left: 28px; text-align: left; }
+.message-corner--right { right: 28px; text-align: right; }
+
+.message-text {
+  font-family: "Caveat", "Segoe Script", "Bradley Hand", cursive;
+  font-size: clamp(30px, 5vw, 52px);
+  font-weight: 700;
+  color: #ffffff;
+  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.22);
+  margin: 0;
+  opacity: 0;
+  transform: translateY(14px);
+  animation: messageIn 550ms ease forwards;
+}
+
+@keyframes messageIn {
+  0% { opacity: 0; transform: translateY(14px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+.hint {
+  position: absolute;
+  top: 76px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.85);
+  background: rgba(0, 0, 0, 0.12);
+  padding: 6px 14px;
+  border-radius: 999px;
+  pointer-events: none;
+  transition: opacity 400ms ease;
+}
+
+.hint.hidden { opacity: 0; }
+
+@media (max-width: 520px) {
+  .topbar { padding: 12px 14px; }
+  .gender-btn { padding: 7px 12px; font-size: 13px; }
+  .primary-btn { padding: 9px 16px; font-size: 13px; }
+}
