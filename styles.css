@@ -65,7 +65,7 @@ body::before {
   pointer-events: none;
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: space-around;
   gap: 16px;
   padding: 14px 20px;
   flex-wrap: wrap;
@@ -210,6 +210,12 @@ body::before {
 @media (max-width: 640px) {
   .gender-selector { transform: scale(0.82); transform-origin: left center; }
   .topbar-right { transform: scale(0.82); transform-origin: right center; }
+
+  /* dvh accounts for mobile browser chrome (address/tab bars) shrinking
+     and growing the viewport, so the page never becomes tall enough to
+     scroll as that chrome shows or hides. */
+  html, body { overflow: hidden; }
+  #app { height: 100dvh; }
 }
 
 @media (max-width: 420px) {
@@ -265,14 +271,13 @@ body::before {
 
 .petal-shape {
   cursor: grab;
-  /* SVG hit-testing follows the path's exact geometry, so thin/pointed
-     petal tips give a real mouse plenty of room but leave a finger only
-     a sliver to land on. A near-invisible stroke pads the touchable area
-     on all sides without visibly changing the petal's shape (a fully
-     transparent stroke is unreliable for hit-testing across browsers). */
-  stroke: rgba(0, 0, 0, 0.006);
-  stroke-width: 18;
-  pointer-events: visiblePainted;
+  /* The thin outline below is off (width 0) by default — it only shows up
+     at mobile widths, once the shadow is switched off there, see the
+     media query further down. vector-effect keeps it a crisp, constant
+     screen-pixel thickness no matter how the viewBox is scaled. */
+  stroke: var(--outline-color, transparent);
+  stroke-width: 0;
+  vector-effect: non-scaling-stroke;
   /* Per-petal shadow — renders on desktop and Android but is silently
      dropped by iOS Safari (WebKit bug: filter on an SVG element nested
      inside transformed <g> ancestors). The #flowerSvg ambient shadow
@@ -289,9 +294,43 @@ body::before {
   cursor: default;
 }
 
+/* Invisible twin of .petal-shape, padded out with a wide stroke, that
+   exists only to catch pointer/touch input — see createPetal() in app.js.
+   Keeping it separate means .petal-shape's own stroke is free to be the
+   visible color outline instead of doing double duty. */
+.petal-hit-area {
+  cursor: grab;
+  fill: rgba(0, 0, 0, 0.006);
+  stroke: rgba(0, 0, 0, 0.006);
+  stroke-width: 18;
+  pointer-events: all;
+}
+
 .center-circle {
   pointer-events: none;
+  stroke: var(--outline-color, transparent);
+  stroke-width: 0;
+  vector-effect: non-scaling-stroke;
   filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.18));
+}
+
+/* At mobile sizes the shadow is dropped in favor of a thin outline on
+   each shape instead — flatter, but crisper and cheaper to render, and
+   it sidesteps the iOS drop-shadow limitations entirely rather than
+   working around them. Placed after the base rules above (not folded
+   into the earlier 640px block) so it actually wins the cascade — same
+   selector specificity, and source order is the tiebreaker. */
+@media (max-width: 640px) {
+  #flowerSvg,
+  .petal-shape,
+  .petal-anchor.is-falling .petal-shape,
+  .center-circle {
+    filter: none;
+  }
+  .petal-shape,
+  .center-circle {
+    stroke-width: 1.5px;
+  }
 }
 
 /* ---------- Messages ----------
@@ -322,6 +361,18 @@ body::before {
   margin: 0;
   opacity: 0;
   animation: messageInOut 2.3s linear forwards;
+}
+
+/* At mobile widths 38% isn't enough room for "She loves me not" etc. to
+   fit on one line — nowrap alone would just let it overflow past its box
+   toward the far screen edge, so the box is also allowed to grow wider
+   (still short of the viewport, matching the margin the JS side already
+   keeps clear on the anchored edge in messageZone()). */
+@media (max-width: 640px) {
+  .message-text {
+    max-width: 86vw;
+    white-space: nowrap;
+  }
 }
 
 /* Quadratic bezier B(t) = (1-t)²·P0 + 2(1-t)t·Pc, sampled at 11 evenly

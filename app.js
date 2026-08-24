@@ -93,6 +93,17 @@
   function toRad(deg) {
     return (deg * Math.PI) / 180;
   }
+  // Derives a matching thin-outline color from a fill color (used only at
+  // small/mobile widths, where the shadow is switched off — see CSS) by
+  // darkening it, rather than using one fixed ink color for every petal
+  // shade.
+  function darken(hex, amount) {
+    const n = parseInt(hex.slice(1), 16);
+    const r = Math.max(0, Math.round(((n >> 16) & 255) * (1 - amount)));
+    const g = Math.max(0, Math.round(((n >> 8) & 255) * (1 - amount)));
+    const b = Math.max(0, Math.round((n & 255) * (1 - amount)));
+    return `rgb(${r}, ${g}, ${b})`;
+  }
 
   // ---------- Background mood ----------
 
@@ -224,6 +235,8 @@
     const organicPetal = family.startsWith("organic") ? ORGANIC_PETALS[Number(family.slice(-1))] : null;
     const petalColor = pick(PETAL_COLORS);
     const centerColor = pick(CENTER_COLORS);
+    const petalOutline = darken(petalColor, 0.12);
+    const centerOutline = darken(centerColor, 0.22);
 
     // Thickness is decided first, and the petal count is capped by it —
     // not the other way around. Thin petals can still pack up to the
@@ -257,7 +270,7 @@
       const upward = petalLength * Math.cos(toRad(angle));
       if (upward > maxUpwardReach) maxUpwardReach = upward;
       petals.push(
-        createPetal(angle, petalLength, width, shape, organicPetal, widthMultiplier, petalColor, i)
+        createPetal(angle, petalLength, width, shape, organicPetal, widthMultiplier, petalColor, petalOutline, i)
       );
     }
     // SVG paints in DOM order, so shuffling the append order randomizes
@@ -271,6 +284,7 @@
     centerCircle.setAttribute("cy", CENTER);
     centerCircle.setAttribute("r", centerRadius);
     centerCircle.setAttribute("fill", centerColor);
+    centerCircle.style.setProperty("--outline-color", centerOutline);
     svg.appendChild(centerCircle);
 
     state.flowerTopReach = maxUpwardReach;
@@ -309,7 +323,7 @@
     return Math.max(min, Math.min(max, v));
   }
 
-  function createPetal(angleDeg, length, width, shape, organicPetal, widthMultiplier, color, index) {
+  function createPetal(angleDeg, length, width, shape, organicPetal, widthMultiplier, color, outlineColor, index) {
     // "pos" carries the petal's on-screen position (world space, used for
     // drag + fall translation). "rot" carries the petal's own orientation
     // (angle + tumble spin). Keeping these as separate nested groups means
@@ -327,6 +341,15 @@
     const path = document.createElementNS(SVG_NS, "path");
     path.setAttribute("class", "petal-shape");
     path.setAttribute("fill", color);
+    path.style.setProperty("--outline-color", outlineColor);
+
+    // A separate, fully invisible copy of the same shape, padded out with
+    // a wide stroke, sitting behind the visible petal purely to catch
+    // pointer/touch input. Keeping it apart from the visible path means
+    // that path's own stroke is free to be the actual (mobile-only, see
+    // CSS) color outline, instead of the two fighting over one stroke.
+    const hitArea = document.createElementNS(SVG_NS, "path");
+    hitArea.setAttribute("class", "petal-hit-area");
 
     if (organicPetal) {
       // Re-anchor the traced shape into our convention (base at the
@@ -336,15 +359,19 @@
       // out thinner or chunkier without warping its natural curve.
       const scaleY = length / organicPetal.h;
       const scaleX = scaleY * widthMultiplier;
-      path.setAttribute("d", organicPetal.d);
-      path.setAttribute(
-        "transform",
-        `scale(${scaleX}, ${scaleY}) translate(${-organicPetal.w / 2}, ${-organicPetal.h})`
-      );
+      const d = organicPetal.d;
+      const transform = `scale(${scaleX}, ${scaleY}) translate(${-organicPetal.w / 2}, ${-organicPetal.h})`;
+      path.setAttribute("d", d);
+      path.setAttribute("transform", transform);
+      hitArea.setAttribute("d", d);
+      hitArea.setAttribute("transform", transform);
     } else {
-      path.setAttribute("d", petalPath(shape, length, width));
+      const d = petalPath(shape, length, width);
+      path.setAttribute("d", d);
+      hitArea.setAttribute("d", d);
     }
 
+    rotGroup.appendChild(hitArea);
     rotGroup.appendChild(path);
     anchor.appendChild(rotGroup);
 
