@@ -14,11 +14,29 @@
   const MESSAGE_LIFETIME_MS = 2300; // must match the messageInOut CSS animation duration
 
   const svg = document.getElementById("flowerSvg");
+  const stage = document.getElementById("stage");
+  const topbar = document.querySelector(".topbar");
   const messageLayer = document.getElementById("messageLayer");
   const hint = document.getElementById("hint");
   const newFlowerBtn = document.getElementById("newFlowerBtn");
   const muteBtn = document.getElementById("muteBtn");
   const genderButtons = Array.from(document.querySelectorAll(".gender-btn"));
+  const endScreen = document.getElementById("endScreen");
+  const endSignText = document.getElementById("endSignText");
+  const endSignSubtext = document.getElementById("endSignSubtext");
+  const tryAgainBtn = document.getElementById("tryAgainBtn");
+  const END_SCREEN_DELAY_MS = 700; // let the last petal's own message land first
+
+  // Object-pronoun form per gender, for the nudge lines that need one
+  // ("ask her out" / "ask him out" / "ask them out").
+  const OBJECT_PRONOUN = { She: "her", He: "him", They: "them" };
+  const WIN_NUDGES = [
+    "Make the first move.",
+    (gender) => `Ask ${OBJECT_PRONOUN[gender]} out.`,
+    (gender) => `Go tell ${OBJECT_PRONOUN[gender]} how you feel.`,
+    "What are you waiting for?",
+    "Now's your moment.",
+  ];
 
   const PETAL_COLORS = ["#f8f4ea", "#f6cdd8", "#f7e3a3"];
   const CENTER_COLORS = ["#eac545", "#e7b23d", "#f0d878"];
@@ -194,6 +212,8 @@
     clearMessages();
     setMood("rest");
     hint.classList.remove("hidden");
+    endScreen.classList.add("hidden");
+    endScreen.classList.remove("outcome-yes", "outcome-no");
 
     // A flower is either the existing formula-drawn style (itself still
     // varying between rounded/pointed/elongated, as before) or one of
@@ -223,13 +243,21 @@
     state.petalsRemaining = count;
     state.pluckedCount = 0;
 
+    // Tracks the single farthest-reaching point above the flower's
+    // center across all its petals — computed analytically from each
+    // petal's own angle + length, rather than measuring rendered DOM
+    // boxes, so it's exact for whichever petal actually ends up topmost.
+    let maxUpwardReach = 0;
     const petals = [];
     for (let i = 0; i < count; i++) {
       const jitter = rand(-angleStep * 0.28, angleStep * 0.28);
       const angle = i * angleStep + jitter;
       const lenJitter = rand(-6, 6);
+      const petalLength = length + lenJitter;
+      const upward = petalLength * Math.cos(toRad(angle));
+      if (upward > maxUpwardReach) maxUpwardReach = upward;
       petals.push(
-        createPetal(angle, length + lenJitter, width, shape, organicPetal, widthMultiplier, petalColor, i)
+        createPetal(angle, petalLength, width, shape, organicPetal, widthMultiplier, petalColor, i)
       );
     }
     // SVG paints in DOM order, so shuffling the append order randomizes
@@ -244,6 +272,37 @@
     centerCircle.setAttribute("r", centerRadius);
     centerCircle.setAttribute("fill", centerColor);
     svg.appendChild(centerCircle);
+
+    state.flowerTopReach = maxUpwardReach;
+    positionHint();
+  }
+
+  // Keeps the hint at most HINT_GAP_PX above the flower's actual
+  // top-most point — not a fixed pixel offset from the topbar, which
+  // would drift apart from (or crowd) the flower as the viewport size,
+  // and therefore the flower's on-screen scale, changes.
+  const HINT_GAP_PX = 100;
+  const HINT_MIN_TOP_PX = 12; // never crowd the topbar above it
+
+  function positionHint() {
+    if (!state.flowerTopReach) return;
+    const svgRect = svg.getBoundingClientRect();
+    const stageRect = stage.getBoundingClientRect();
+    if (svgRect.height === 0 || svgRect.width === 0) return;
+    // The <svg> element itself is stretched to fill the whole (non-square)
+    // stage, but its 600x600 viewBox content is "meet"-fitted to the
+    // smaller of the two dimensions and letterboxed/centered within the
+    // rest — so both the scale AND the vertical offset have to account
+    // for that letterbox gap, not just the element's own top/height.
+    const renderedSize = Math.min(svgRect.width, svgRect.height);
+    const scale = renderedSize / VIEW_SIZE;
+    const contentTop = svgRect.top + (svgRect.height - renderedSize) / 2;
+    const flowerTopScreenY = contentTop + (CENTER - state.flowerTopReach) * scale;
+    const hintHeight = hint.offsetHeight;
+    const desiredTop = flowerTopScreenY - HINT_GAP_PX - hintHeight;
+    const minTop = topbar.getBoundingClientRect().bottom + HINT_MIN_TOP_PX;
+    const finalTop = Math.max(minTop, desiredTop);
+    hint.style.top = `${finalTop - stageRect.top}px`;
   }
 
   function clamp(v, min, max) {
@@ -518,6 +577,10 @@
     return gender === "They" ? "love" : "loves";
   }
 
+  function negVerbFor(gender) {
+    return gender === "They" ? "don't love" : "doesn't love";
+  }
+
   function onPluck() {
     state.pluckedCount += 1;
     state.petalsRemaining -= 1;
@@ -530,6 +593,27 @@
 
     setMood(isLovesMe ? "yes" : "no");
     showMessage(text, isLovesMe ? "left" : "right");
+
+    // The last petal's answer is the flower's verdict — the sign that
+    // drops in echoes it, rather than restating the "me not" phrasing.
+    if (state.petalsRemaining === 0) {
+      setTimeout(() => showEndScreen(isLovesMe), END_SCREEN_DELAY_MS);
+    }
+  }
+
+  function showEndScreen(isLovesMe) {
+    endSignText.textContent = isLovesMe
+      ? `${state.gender} ${verbFor(state.gender)} me`
+      : `${state.gender} ${negVerbFor(state.gender)} me`;
+    const nudge = pick(WIN_NUDGES);
+    endSignSubtext.textContent = isLovesMe
+      ? typeof nudge === "function"
+        ? nudge(state.gender)
+        : nudge
+      : "";
+    endScreen.classList.remove("outcome-yes", "outcome-no");
+    endScreen.classList.add(isLovesMe ? "outcome-yes" : "outcome-no");
+    endScreen.classList.remove("hidden");
   }
 
   function showMessage(text, side) {
@@ -593,12 +677,25 @@
   });
 
   newFlowerBtn.addEventListener("click", generateFlower);
+  tryAgainBtn.addEventListener("click", generateFlower);
 
   muteBtn.addEventListener("click", () => {
     state.muted = !state.muted;
     muteBtn.classList.toggle("is-muted", state.muted);
     muteBtn.setAttribute("aria-pressed", String(state.muted));
     muteBtn.title = state.muted ? "Unmute sound" : "Mute sound";
+  });
+
+  // Re-run the hint's positioning on any viewport change (resize,
+  // rotation, zoom) so the 100px gap stays correct responsively rather
+  // than only being right at the moment the flower was generated.
+  let hintResizeRaf = null;
+  window.addEventListener("resize", () => {
+    if (hintResizeRaf) return;
+    hintResizeRaf = requestAnimationFrame(() => {
+      hintResizeRaf = null;
+      positionHint();
+    });
   });
 
   generateFlower();
