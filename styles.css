@@ -233,11 +233,30 @@ body::before {
   width: 100%;
   height: 100%;
   overflow: visible;
+  /* Applied here on the outer <svg> (not on the individual petals nested
+     several transformed <g> levels deep inside it) because WebKit/Safari
+     silently fails to render filter: drop-shadow() on SVG elements that
+     sit inside transformed ancestor groups — confirmed missing on iPhone
+     even though it renders fine on desktop. A filter directly on a
+     top-level <svg> (no SVG ancestor) is unaffected, matching how the
+     .wood-hex buttons already render their shadow correctly everywhere.
+     This is a soft ambient shadow under the flower as a whole — it's the
+     only one iOS can render, so it's kept light/diffuse on purpose. The
+     per-petal shadows below are the "real" ones and still do the visible
+     work on every browser that supports them. */
+  filter: drop-shadow(0 8px 14px rgba(0, 0, 0, 0.16));
 }
 
 .petal-anchor {
   touch-action: none;
   transition: none;
+  /* Without these, iOS Safari can hijack a slow or held drag with its own
+     text-selection/callout gesture, aborting the pointer sequence mid-pull
+     — the drag then feels like it randomly "doesn't take". */
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .petal-anchor.snapping {
@@ -246,6 +265,19 @@ body::before {
 
 .petal-shape {
   cursor: grab;
+  /* SVG hit-testing follows the path's exact geometry, so thin/pointed
+     petal tips give a real mouse plenty of room but leave a finger only
+     a sliver to land on. A near-invisible stroke pads the touchable area
+     on all sides without visibly changing the petal's shape (a fully
+     transparent stroke is unreliable for hit-testing across browsers). */
+  stroke: rgba(0, 0, 0, 0.006);
+  stroke-width: 18;
+  pointer-events: visiblePainted;
+  /* Per-petal shadow — renders on desktop and Android but is silently
+     dropped by iOS Safari (WebKit bug: filter on an SVG element nested
+     inside transformed <g> ancestors). The #flowerSvg ambient shadow
+     above is what keeps the flower from looking flat on iPhone; this one
+     is the extra layered depth for browsers that support it. */
   filter: drop-shadow(0 4px 5px rgba(0, 0, 0, 0.14));
   transition: filter 150ms ease;
 }
