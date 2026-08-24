@@ -1,10 +1,10 @@
 :root {
-  --bg-rest-top: #a9c1ab;
-  --bg-rest-bottom: #a3bda5;
-  --bg-yes-top: #8cb695;
-  --bg-yes-bottom: #8cb695;
+  --bg-rest-top: #94ac99;
+  --bg-rest-bottom: #6a9172;
+  --bg-yes-top: #a9c0ae;
+  --bg-yes-bottom: #799c80;
   --bg-no-top: #91a194;
-  --bg-no-bottom: #91a194;
+  --bg-no-bottom: #4f5d52;
 
   --bg-a: var(--bg-rest-top);
   --bg-b: var(--bg-rest-bottom);
@@ -23,17 +23,24 @@ html, body {
 body {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   color: var(--ink);
-  /* A soft gingham/plaid weave in the same green family as the mood color:
-     two sets of translucent white bands (one running each way) blended
-     over the base gradient. Where they cross, the extra blending creates
-     the classic checked look — subtly, since it's just tonal variation
-     within the existing green, not a separate pattern color. */
-  background-image:
-    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.12) 0 27px, transparent 27px 94.5px),
-    repeating-linear-gradient(180deg, rgba(255, 255, 255, 0.12) 0 27px, transparent 27px 94.5px),
-    linear-gradient(180deg, var(--bg-a) 0%, var(--bg-b) 100%);
-  background-blend-mode: soft-light, soft-light, normal;
+  background-image: linear-gradient(135deg, var(--bg-a) 0%, var(--bg-b) 100%);
   transition: background-image 900ms ease;
+}
+
+/* Cloudy texture overlay, faint (14%) and fixed to the viewport, sitting
+   behind everything else. A separate layer (not folded into body's own
+   background-image) so its opacity can be controlled independently of
+   the gingham pattern and mood gradient beneath it. */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  background-image: url("assets/texture-overlay.png");
+  background-size: cover;
+  background-position: center;
+  opacity: 0.14;
+  pointer-events: none;
+  z-index: 0;
 }
 
 #app {
@@ -64,36 +71,81 @@ body {
   flex-wrap: wrap;
 }
 
+/* Carved-wood hex buttons: an SVG hexagon sits behind the label as a
+   plain background layer, so the exact vector artwork stays crisp at any
+   size. The shadow is deliberately NOT baked into the SVG (an SVG filter's
+   own bounding-box math shifts against preserveAspectRatio="none"
+   stretching, throwing the shape out of alignment with the label on top
+   of it) — it's a plain CSS drop-shadow instead, applied in screen space
+   after layout, so it can never desync from the text. */
+
+.btn-label {
+  position: relative;
+  z-index: 2;
+  font-family: "Berkshire Swash", "Caveat", cursive, serif;
+  color: #ffffff;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.wood-hex {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  pointer-events: none;
+  filter: drop-shadow(0 4px 4px rgba(0, 0, 0, 0.25));
+}
+
 .gender-selector {
+  position: relative;
   display: inline-flex;
   pointer-events: auto;
-  background: rgba(255, 255, 255, 0.35);
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
-  border-radius: 999px;
-  padding: 4px;
-  gap: 2px;
+}
+
+.wood-track {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 0;
+  pointer-events: none;
+}
+
+/* One shared hex that slides (with a bounce) to whichever option is
+   active, instead of each button crossfading its own copy in place. */
+.gender-active-hex {
+  z-index: 1;
+  top: 0;
+  left: 0;
+  right: auto;
+  bottom: auto;
+  width: 128px;
+  height: 48px;
+  transition: transform 550ms cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 .gender-btn {
+  position: relative;
+  z-index: 2;
+  width: 128px;
+  height: 48px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   border: none;
   background: transparent;
-  color: var(--ink);
-  font-size: 14px;
-  font-weight: 600;
-  padding: 8px 16px;
-  border-radius: 999px;
   cursor: pointer;
-  transition: background 200ms ease, color 200ms ease, transform 150ms ease;
+  padding: 0;
+  transition: transform 150ms ease;
 }
 
-.gender-btn:hover { background: rgba(255, 255, 255, 0.35); }
+.gender-btn .btn-label { font-size: 17px; }
 
-.gender-btn.active {
-  background: #ffffff;
-  color: #3a6b3d;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
-}
+.gender-btn:hover:not(.active) { transform: translateY(-1px); }
+.gender-btn:active { transform: scale(0.96); }
 
 .topbar-right {
   display: inline-flex;
@@ -103,43 +155,68 @@ body {
 }
 
 .icon-btn {
-  width: 38px;
-  height: 38px;
+  position: relative;
+  width: 83px;
+  height: 48px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   border: none;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.35);
-  color: var(--ink);
+  background: transparent;
   cursor: pointer;
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
-  transition: background 200ms ease, transform 150ms ease;
+  padding: 0;
+  transition: transform 150ms ease;
 }
 
-.icon-btn:hover { background: rgba(255, 255, 255, 0.5); }
-.icon-btn:active { transform: scale(0.92); }
+.icon-btn .wood-hex { transition: opacity 250ms ease; }
+.icon-btn.is-muted .wood-hex { opacity: 0.4; }
+
+.icon-btn .icon-unmuted,
+.icon-btn .icon-muted {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 1;
+  pointer-events: none;
+}
 
 .icon-muted { display: none; }
 .icon-btn.is-muted .icon-unmuted { display: none; }
 .icon-btn.is-muted .icon-muted { display: block; }
 
+.icon-btn:hover { transform: translateY(-1px); }
+.icon-btn:active { transform: scale(0.94); }
+
 .primary-btn {
+  position: relative;
+  width: 203px;
+  height: 48px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   border: none;
-  background: #ffffff;
-  color: #3a6b3d;
-  font-size: 14px;
-  font-weight: 700;
-  padding: 10px 20px;
-  border-radius: 999px;
+  background: transparent;
   cursor: pointer;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
-  transition: transform 150ms ease, box-shadow 150ms ease;
+  padding: 0;
+  transition: transform 150ms ease;
 }
 
-.primary-btn:hover { box-shadow: 0 4px 12px rgba(0, 0, 0, 0.16); }
+.primary-btn .btn-label { font-size: 16px; }
+
+.primary-btn:hover { transform: translateY(-1px); }
 .primary-btn:active { transform: scale(0.96); }
+
+@media (max-width: 640px) {
+  .gender-selector { transform: scale(0.82); transform-origin: left center; }
+  .topbar-right { transform: scale(0.82); transform-origin: right center; }
+}
+
+@media (max-width: 420px) {
+  .topbar { justify-content: center; }
+  .gender-selector { transform: scale(0.72); transform-origin: center; }
+  .topbar-right { transform: scale(0.72); transform-origin: center; }
+}
 
 /* ---------- Stage ---------- */
 
@@ -206,13 +283,15 @@ body {
   text-shadow: 0 2px 6px rgba(0, 0, 0, 0.22);
   margin: 0;
   opacity: 0;
-  transform: translateY(14px);
-  animation: messageIn 550ms ease forwards;
+  transform: translateY(130px);
+  animation: messageInOut 3.4s cubic-bezier(0.22, 1, 0.36, 1) forwards;
 }
 
-@keyframes messageIn {
-  0% { opacity: 0; transform: translateY(14px); }
-  100% { opacity: 1; transform: translateY(0); }
+@keyframes messageInOut {
+  0% { opacity: 0; transform: translateY(130px); }
+  12% { opacity: 1; transform: translateY(0); }
+  88% { opacity: 1; transform: translateY(0); }
+  100% { opacity: 0; transform: translateY(0); }
 }
 
 .hint {

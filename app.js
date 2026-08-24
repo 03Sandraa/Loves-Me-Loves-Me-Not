@@ -11,6 +11,7 @@
   const VELOCITY_WINDOW_MS = 120; // how far back we look to estimate release speed
   const FADE_MS = 450;
   const SAFETY_MAX_ELAPSED = 8000; // ms — hard cap so a petal always eventually cleans up
+  const MESSAGE_LIFETIME_MS = 3400; // must match the messageInOut CSS animation duration
 
   const svg = document.getElementById("flowerSvg");
   const cornerLeft = document.getElementById("cornerLeft");
@@ -458,16 +459,27 @@
     const p = document.createElement("p");
     p.className = "message-text";
     p.textContent = text;
+    p.addEventListener("animationend", () => p.remove());
+    // Belt-and-suspenders: some browsers can be slow to dispatch
+    // animationend on a backgrounded/inactive tab, so a plain timer
+    // guarantees the message still clears itself after ~3s.
+    setTimeout(() => p.remove(), MESSAGE_LIFETIME_MS);
     target.appendChild(p);
   }
 
   // ---------- Controls ----------
 
-  genderButtons.forEach((btn) => {
+  const genderActiveHex = document.getElementById("genderActiveHex");
+
+  genderButtons.forEach((btn, index) => {
     btn.addEventListener("click", () => {
       genderButtons.forEach((b) => b.classList.remove("active"));
       btn.classList.add("active");
       state.gender = btn.dataset.gender;
+
+      if (genderActiveHex) {
+        genderActiveHex.style.transform = `translateX(${index * btn.offsetWidth}px)`;
+      }
 
       const current = cornerLeft.querySelector(".message-text") || cornerRight.querySelector(".message-text");
       if (current && state.pluckedCount > 0) {
