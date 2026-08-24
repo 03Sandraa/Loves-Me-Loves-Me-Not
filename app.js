@@ -11,11 +11,10 @@
   const VELOCITY_WINDOW_MS = 120; // how far back we look to estimate release speed
   const FADE_MS = 450;
   const SAFETY_MAX_ELAPSED = 8000; // ms — hard cap so a petal always eventually cleans up
-  const MESSAGE_LIFETIME_MS = 3400; // must match the messageInOut CSS animation duration
+  const MESSAGE_LIFETIME_MS = 2300; // must match the messageInOut CSS animation duration
 
   const svg = document.getElementById("flowerSvg");
-  const cornerLeft = document.getElementById("cornerLeft");
-  const cornerRight = document.getElementById("cornerRight");
+  const messageLayer = document.getElementById("messageLayer");
   const hint = document.getElementById("hint");
   const newFlowerBtn = document.getElementById("newFlowerBtn");
   const muteBtn = document.getElementById("muteBtn");
@@ -24,6 +23,29 @@
   const PETAL_COLORS = ["#f8f4ea", "#f6cdd8", "#f7e3a3"];
   const CENTER_COLORS = ["#eac545", "#e7b23d", "#f0d878"];
   const SHAPES = ["rounded", "pointed", "elongated"];
+
+  // Hand-drawn organic petal outlines (traced ellipses, not the formula
+  // shapes above). Each is a fixed silhouette rather than a parametric
+  // curve, so it's used as-is and just scaled to the flower's petal
+  // length — w/h are its native SVG viewBox size, needed to re-anchor it
+  // (core edge at the flower center, outer edge as the tip) and scale it.
+  const ORGANIC_PETALS = [
+    {
+      w: 122,
+      h: 247,
+      d: "M119.295 123.5C106.295 199 92.8795 247 60.2947 247C27.7099 247 9.51145 196 1.29473 123.5C-7.20532 48.5 27.7099 0 60.2947 0C92.8795 0 130.315 59.5 119.295 123.5Z",
+    },
+    {
+      w: 128,
+      h: 241,
+      d: "M127.465 67.2651C127.465 135.472 95.5778 240.897 68.5159 240.897C41.4539 240.897 -2.40796e-05 137.719 -1.21538e-05 69.5119C-6.89196e-07 -4.72839 28.563 0.0626115 55.6249 0.0626162C82.6869 0.062621 123.315 8.40446 127.465 67.2651Z",
+    },
+    {
+      w: 123,
+      h: 210,
+      d: "M122.735 61.4585C122.735 129.666 97.5 209.647 61.9657 209.647C26.4315 209.647 0 111.438 0 43.231C0 -24.9762 36.5624 7.94011 63.6243 7.94011C90.6863 7.94011 122.735 -6.7487 122.735 61.4585Z",
+    },
+  ];
 
   const state = {
     gender: "She",
@@ -173,14 +195,27 @@
     setMood("rest");
     hint.classList.remove("hidden");
 
-    const count = randInt(7, 35);
-    const shape = pick(SHAPES);
+    // A flower is either the existing formula-drawn style (itself still
+    // varying between rounded/pointed/elongated, as before) or one of
+    // the 3 hand-drawn organic shapes — never a mix of both within one
+    // flower. Four equally-likely top-level choices.
+    const family = pick(["formula", "organic0", "organic1", "organic2"]);
+    const shape = family === "formula" ? pick(SHAPES) : null;
+    const organicPetal = family.startsWith("organic") ? ORGANIC_PETALS[Number(family.slice(-1))] : null;
     const petalColor = pick(PETAL_COLORS);
     const centerColor = pick(CENTER_COLORS);
 
+    // Thickness is decided first, and the petal count is capped by it —
+    // not the other way around. Thin petals can still pack up to the
+    // usual 35; chunky ones get a lower ceiling, so a flower full of fat
+    // petals never fuses into one solid disc and still reads as a flower.
+    const widthMultiplier = rand(0.7, 1.5);
+    const maxCount = clamp(Math.round(35 / widthMultiplier), 9, 35);
+    const count = randInt(7, maxCount);
+
     const length = clamp(172 - (count - 7) * 1.05, 128, 172);
     const baseWidth = clamp(66 - (count - 7) * 0.95, 26, 66);
-    const width = baseWidth * (SHAPE_WIDTH_SCALE[shape] || 1);
+    const width = baseWidth * widthMultiplier * (SHAPE_WIDTH_SCALE[shape] || 1);
     const angleStep = 360 / count;
     const centerRadius = clamp(58 - (count - 7) * 0.15, 40, 58);
 
@@ -193,7 +228,9 @@
       const jitter = rand(-angleStep * 0.28, angleStep * 0.28);
       const angle = i * angleStep + jitter;
       const lenJitter = rand(-6, 6);
-      petals.push(createPetal(angle, length + lenJitter, width, shape, petalColor, i));
+      petals.push(
+        createPetal(angle, length + lenJitter, width, shape, organicPetal, widthMultiplier, petalColor, i)
+      );
     }
     // SVG paints in DOM order, so shuffling the append order randomizes
     // which petals overlap which — a more natural, less mechanical stack.
@@ -213,7 +250,7 @@
     return Math.max(min, Math.min(max, v));
   }
 
-  function createPetal(angleDeg, length, width, shape, color, index) {
+  function createPetal(angleDeg, length, width, shape, organicPetal, widthMultiplier, color, index) {
     // "pos" carries the petal's on-screen position (world space, used for
     // drag + fall translation). "rot" carries the petal's own orientation
     // (angle + tumble spin). Keeping these as separate nested groups means
@@ -230,8 +267,24 @@
 
     const path = document.createElementNS(SVG_NS, "path");
     path.setAttribute("class", "petal-shape");
-    path.setAttribute("d", petalPath(shape, length, width));
     path.setAttribute("fill", color);
+
+    if (organicPetal) {
+      // Re-anchor the traced shape into our convention (base at the
+      // flower center, tip pointing away). Length always scales from the
+      // flower's petal length; width scales that same amount further by
+      // the flower's widthMultiplier, so the traced silhouette can come
+      // out thinner or chunkier without warping its natural curve.
+      const scaleY = length / organicPetal.h;
+      const scaleX = scaleY * widthMultiplier;
+      path.setAttribute("d", organicPetal.d);
+      path.setAttribute(
+        "transform",
+        `scale(${scaleX}, ${scaleY}) translate(${-organicPetal.w / 2}, ${-organicPetal.h})`
+      );
+    } else {
+      path.setAttribute("d", petalPath(shape, length, width));
+    }
 
     rotGroup.appendChild(path);
     anchor.appendChild(rotGroup);
@@ -430,9 +483,35 @@
 
   // ---------- Messages / mood per pluck ----------
 
+  // Two fixed, reserved spots: "loves me" always bottom-left, "loves me
+  // not" always bottom-right — each held well clear of the screen edges
+  // by a fixed margin (with a little jitter so it's not pixel-identical
+  // every time, but always in that corner).
+  function messageZone(side) {
+    const marginSide = rand(6, 9.5);
+    const marginBottom = rand(9, 14);
+    return side === "left"
+      ? { side, left: marginSide, bottom: marginBottom }
+      : { side, right: marginSide, bottom: marginBottom };
+  }
+
   function clearMessages() {
-    cornerLeft.innerHTML = "";
-    cornerRight.innerHTML = "";
+    messageLayer.innerHTML = "";
+  }
+
+  // If a message is still mid-flight (hasn't finished its own fade-out)
+  // when a new pluck arrives, let it drop out of view instead of just
+  // popping away. Freezing its current transform/opacity as inline
+  // styles first means the fall continues smoothly from wherever it
+  // already was, instead of jumping back to some default state.
+  function dismissCurrentMessage() {
+    const existing = messageLayer.querySelector(".message-text");
+    if (!existing) return;
+    const cs = getComputedStyle(existing);
+    existing.style.transform = cs.transform;
+    existing.style.opacity = cs.opacity;
+    existing.classList.add("is-dismissed");
+    setTimeout(() => existing.remove(), 450);
   }
 
   function verbFor(gender) {
@@ -454,17 +533,38 @@
   }
 
   function showMessage(text, side) {
-    clearMessages();
-    const target = side === "left" ? cornerLeft : cornerRight;
+    dismissCurrentMessage();
     const p = document.createElement("p");
     p.className = "message-text";
     p.textContent = text;
+
+    const zone = messageZone(side);
+    p.style.textAlign = zone.side;
+    if (zone.left !== undefined) p.style.left = `${zone.left}%`;
+    if (zone.right !== undefined) p.style.right = `${zone.right}%`;
+    p.style.bottom = `${zone.bottom}%`;
+
+    // A real quadratic-bezier hook, mirrored per side: it rises from
+    // below first (staying out toward its own side), then curves inward
+    // late to settle in its spot — not a straight-line slide.
+    const dir = side === "left" ? -1 : 1;
+    const sx = dir * rand(75, 115);
+    const sy = rand(110, 155);
+    const cx = sx * 0.85;
+    const cy = sy * 0.12;
+    const tilt = Math.random() < 0.4 ? rand(4, 9) * (Math.random() < 0.5 ? -1 : 1) : 0;
+    p.style.setProperty("--sx", sx.toFixed(1));
+    p.style.setProperty("--sy", sy.toFixed(1));
+    p.style.setProperty("--cx", cx.toFixed(1));
+    p.style.setProperty("--cy", cy.toFixed(1));
+    p.style.setProperty("--tilt", tilt.toFixed(1));
+
     p.addEventListener("animationend", () => p.remove());
     // Belt-and-suspenders: some browsers can be slow to dispatch
     // animationend on a backgrounded/inactive tab, so a plain timer
     // guarantees the message still clears itself after ~3s.
     setTimeout(() => p.remove(), MESSAGE_LIFETIME_MS);
-    target.appendChild(p);
+    messageLayer.appendChild(p);
   }
 
   // ---------- Controls ----------
@@ -481,7 +581,7 @@
         genderActiveHex.style.transform = `translateX(${index * btn.offsetWidth}px)`;
       }
 
-      const current = cornerLeft.querySelector(".message-text") || cornerRight.querySelector(".message-text");
+      const current = messageLayer.querySelector(".message-text:not(.is-dismissed)");
       if (current && state.pluckedCount > 0) {
         const isLovesMe = state.pluckedCount % 2 === 1;
         const verb = verbFor(state.gender);
