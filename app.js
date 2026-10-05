@@ -38,8 +38,22 @@
     "Now's your moment.",
   ];
 
-  const PETAL_COLORS = ["#f8f4ea", "#f6cdd8", "#f7e3a3"];
-  const CENTER_COLORS = ["#eac545", "#e7b23d", "#f0d878"];
+  // Hand-picked flower palettes: the center disc, plus the petal gradient
+  // running from the color at the petal's base (next to the core) out to
+  // the color at its tip. One is chosen per flower.
+  const FLOWER_PALETTES = [
+    { center: "#f0a9ce", core: "#ffd5e7", tip: "#ffffff" },
+    { center: "#ffffff", core: "#ffffff", tip: "#ffb4d5" },
+    { center: "#e278a6", core: "#f0b9f3", tip: "#d65a90" },
+    { center: "#ffffff", core: "#f0b9f3", tip: "#bf8fe6" },
+    { center: "#ffbc81", core: "#fff3e2", tip: "#ffffff" },
+    { center: "#ffec72", core: "#fff3e2", tip: "#ffffff" },
+    { center: "#603927", core: "#e8a144", tip: "#ffd972" },
+    { center: "#ffffff", core: "#7b79d1", tip: "#a4d0ff" },
+    { center: "#eae9ff", core: "#7b79d1", tip: "#ffffff" },
+    { center: "#ffb1b1", core: "#ffffff", tip: "#e56969" },
+    { center: "#c86161", core: "#ffcccc", tip: "#e56969" },
+  ];
   const SHAPES = ["rounded", "pointed", "elongated"];
 
   // Hand-drawn organic petal outlines (traced ellipses, not the formula
@@ -97,6 +111,10 @@
   // small/mobile widths, where the shadow is switched off — see CSS) by
   // darkening it, rather than using one fixed ink color for every petal
   // shade.
+  function brightness(hex) {
+    const n = parseInt(hex.slice(1), 16);
+    return ((n >> 16) & 255) + ((n >> 8) & 255) + (n & 255);
+  }
   function darken(hex, amount) {
     const n = parseInt(hex.slice(1), 16);
     const r = Math.max(0, Math.round(((n >> 16) & 255) * (1 - amount)));
@@ -109,15 +127,9 @@
 
   function setMood(mood) {
     const root = document.documentElement.style;
-    if (mood === "yes") {
-      root.setProperty("--bg-a", "var(--bg-yes-top)");
-      root.setProperty("--bg-b", "var(--bg-yes-bottom)");
-    } else if (mood === "no") {
-      root.setProperty("--bg-a", "var(--bg-no-top)");
-      root.setProperty("--bg-b", "var(--bg-no-bottom)");
-    } else {
-      root.setProperty("--bg-a", "var(--bg-rest-top)");
-      root.setProperty("--bg-b", "var(--bg-rest-bottom)");
+    const key = mood === "yes" || mood === "no" ? mood : "rest";
+    for (let i = 1; i <= 4; i++) {
+      root.setProperty(`--bg-${i}`, `var(--bg-${key}-${i})`);
     }
   }
 
@@ -233,10 +245,38 @@
     const family = pick(["formula", "organic0", "organic1", "organic2"]);
     const shape = family === "formula" ? pick(SHAPES) : null;
     const organicPetal = family.startsWith("organic") ? ORGANIC_PETALS[Number(family.slice(-1))] : null;
-    const petalColor = pick(PETAL_COLORS);
-    const centerColor = pick(CENTER_COLORS);
-    const petalOutline = darken(petalColor, 0.12);
+    const palette = pick(FLOWER_PALETTES);
+    const centerColor = palette.center;
+    // The mobile-only outline follows whichever petal end is darker, so it
+    // never vanishes against a white tip or core.
+    const petalOutline = darken(brightness(palette.core) < brightness(palette.tip) ? palette.core : palette.tip, 0.2);
     const centerOutline = darken(centerColor, 0.22);
+
+    // objectBoundingBox gradient, shared by every petal in this flower:
+    // each petal's own path data runs from its base (max y, nearest the
+    // flower center) to its tip (min y) in its own local space — before
+    // that path's own transform is applied, which is exactly the space
+    // objectBoundingBox measures in — so one shared definition orients
+    // correctly per petal regardless of its individual length or angle.
+    const defs = document.createElementNS(SVG_NS, "defs");
+    const gradient = document.createElementNS(SVG_NS, "linearGradient");
+    const gradientId = "petalGradient";
+    gradient.setAttribute("id", gradientId);
+    gradient.setAttribute("x1", "0");
+    gradient.setAttribute("y1", "1");
+    gradient.setAttribute("x2", "0");
+    gradient.setAttribute("y2", "0");
+    const stopBase = document.createElementNS(SVG_NS, "stop");
+    stopBase.setAttribute("offset", "0");
+    stopBase.setAttribute("stop-color", palette.core);
+    const stopTip = document.createElementNS(SVG_NS, "stop");
+    stopTip.setAttribute("offset", "1");
+    stopTip.setAttribute("stop-color", palette.tip);
+    gradient.appendChild(stopBase);
+    gradient.appendChild(stopTip);
+    defs.appendChild(gradient);
+    svg.appendChild(defs);
+    const petalFill = `url(#${gradientId})`;
 
     // Thickness is decided first, and the petal count is capped by it —
     // not the other way around. Thin petals can still pack up to the
@@ -261,6 +301,7 @@
     // petal's own angle + length, rather than measuring rendered DOM
     // boxes, so it's exact for whichever petal actually ends up topmost.
     let maxUpwardReach = 0;
+    let maxDownwardReach = 0;
     const petals = [];
     for (let i = 0; i < count; i++) {
       const jitter = rand(-angleStep * 0.28, angleStep * 0.28);
@@ -269,8 +310,9 @@
       const petalLength = length + lenJitter;
       const upward = petalLength * Math.cos(toRad(angle));
       if (upward > maxUpwardReach) maxUpwardReach = upward;
+      if (-upward > maxDownwardReach) maxDownwardReach = -upward;
       petals.push(
-        createPetal(angle, petalLength, width, shape, organicPetal, widthMultiplier, petalColor, petalOutline, i)
+        createPetal(angle, petalLength, width, shape, organicPetal, widthMultiplier, petalFill, petalOutline, i)
       );
     }
     // SVG paints in DOM order, so shuffling the append order randomizes
@@ -288,6 +330,7 @@
     svg.appendChild(centerCircle);
 
     state.flowerTopReach = maxUpwardReach;
+    state.flowerBottomReach = maxDownwardReach;
     positionHint();
   }
 
@@ -315,7 +358,14 @@
     const hintHeight = hint.offsetHeight;
     const desiredTop = flowerTopScreenY - HINT_GAP_PX - hintHeight;
     const minTop = topbar.getBoundingClientRect().bottom + HINT_MIN_TOP_PX;
-    const finalTop = Math.max(minTop, desiredTop);
+    let finalTop = Math.max(minTop, desiredTop);
+    // The top bar sits well inside the frame, so a tall flower can leave no
+    // room between it and the bar — rather than overlapping the petals, the
+    // hint then goes just beneath the flower instead.
+    if (finalTop + hintHeight > flowerTopScreenY - HINT_MIN_TOP_PX / 2) {
+      const flowerBottomScreenY = contentTop + (CENTER + state.flowerBottomReach) * scale;
+      finalTop = flowerBottomScreenY + 24;
+    }
     hint.style.top = `${finalTop - stageRect.top}px`;
   }
 

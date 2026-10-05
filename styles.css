@@ -1,15 +1,34 @@
-:root {
-  --bg-rest-top: #94ac99;
-  --bg-rest-bottom: #6a9172;
-  --bg-yes-top: #a9c0ae;
-  --bg-yes-bottom: #799c80;
-  --bg-no-top: #91a194;
-  --bg-no-bottom: #4f5d52;
+/* The background is a 4-stop vertical gradient (pale grey sky → dusty rose →
+   warm tan → sage). The stops are registered <color> properties so a mood
+   change (see setMood in app.js) cross-fades smoothly instead of snapping. */
+@property --bg-1 { syntax: "<color>"; inherits: true; initial-value: #dcdad9; }
+@property --bg-2 { syntax: "<color>"; inherits: true; initial-value: #c4a8aa; }
+@property --bg-3 { syntax: "<color>"; inherits: true; initial-value: #b8a687; }
+@property --bg-4 { syntax: "<color>"; inherits: true; initial-value: #86997d; }
 
-  --bg-a: var(--bg-rest-top);
-  --bg-b: var(--bg-rest-bottom);
+:root {
+  --bg-rest-1: #dcdad9;
+  --bg-rest-2: #c4a8aa;
+  --bg-rest-3: #b8a687;
+  --bg-rest-4: #86997d;
+
+  --bg-yes-1: #e6dcdb;
+  --bg-yes-2: #d2aeb2;
+  --bg-yes-3: #c6ab84;
+  --bg-yes-4: #8fa97f;
+
+  --bg-no-1: #d0cece;
+  --bg-no-2: #b19ca0;
+  --bg-no-3: #a39a82;
+  --bg-no-4: #6c7f66;
+
+  --bg-1: var(--bg-rest-1);
+  --bg-2: var(--bg-rest-2);
+  --bg-3: var(--bg-rest-3);
+  --bg-4: var(--bg-rest-4);
 
   --ink: #2f3b30;
+  --pill-active: rgba(139, 104, 84, 0.62);
 }
 
 * { box-sizing: border-box; }
@@ -20,17 +39,30 @@ html, body {
   overscroll-behavior: none;
 }
 
+html {
+  transition:
+    --bg-1 900ms ease,
+    --bg-2 900ms ease,
+    --bg-3 900ms ease,
+    --bg-4 900ms ease;
+}
+
 body {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   color: var(--ink);
-  background-image: linear-gradient(135deg, var(--bg-a) 0%, var(--bg-b) 100%);
-  transition: background-image 900ms ease;
+  background-image: linear-gradient(
+    180deg,
+    var(--bg-1) 0%,
+    var(--bg-2) 30%,
+    var(--bg-3) 55%,
+    var(--bg-4) 100%
+  );
 }
 
 /* Cloudy texture overlay, faint (14%) and fixed to the viewport, sitting
    behind everything else. A separate layer (not folded into body's own
    background-image) so its opacity can be controlled independently of
-   the gingham pattern and mood gradient beneath it. */
+   the mood gradient beneath it. */
 body::before {
   content: "";
   position: fixed;
@@ -43,185 +75,262 @@ body::before {
   z-index: 0;
 }
 
+/* --corner is the one number the whole decorative frame (and the top bar's
+   inset inside it) scales from; --u is "one unit" of the corner artwork's
+   218-wide drawing, so every frame measurement below is written in the
+   artwork's own units and stays proportional at any screen size. */
 #app {
+  --frame-inset: clamp(6px, 1.9vw, 30px);
+  --corner: clamp(88px, 15vw, 218px);
+  --u: calc(var(--corner) / 218);
+
   position: relative;
   height: 100vh;
   overflow: hidden;
 }
 
+/* ---------- Decorative frame ----------
+   Four corner brackets (one symbol, mirrored into each corner) joined by
+   four edge-centre segments. The segments are built from CSS — two rules
+   and a diamond at each end — rather than stretching the drawn artwork,
+   so their diamonds stay undistorted however long or short the span is.
+   Everything is measured in --u (see #app) and sits behind the stage, so
+   petals fall in front of it. */
+
+.frame {
+  position: absolute;
+  inset: var(--frame-inset);
+  z-index: 1;
+  pointer-events: none;
+  opacity: 0.5;
+}
+
+.frame-corner {
+  position: absolute;
+  display: block;
+  width: var(--corner);
+  height: auto;
+  aspect-ratio: 218 / 216;
+}
+
+/* The artwork is drawn for the bottom-right corner. */
+.frame-corner--br { right: 0; bottom: 0; }
+.frame-corner--bl { left: 0; bottom: 0; transform: scaleX(-1); }
+.frame-corner--tr { right: 0; top: 0; transform: scaleY(-1); }
+.frame-corner--tl { left: 0; top: 0; transform: scale(-1, -1); }
+
+/* A segment is a thick rule and a thin rule (thick on the outer side, to
+   match the corners) running between two diamonds. The rules are two
+   background layers; the diamonds are the pseudo-elements. */
+.frame-edge {
+  position: absolute;
+  background-image: linear-gradient(#fff, #fff), linear-gradient(#fff, #fff);
+  background-repeat: no-repeat;
+}
+
+.frame-edge::before,
+.frame-edge::after {
+  content: "";
+  position: absolute;
+  width: calc(16 * var(--u));
+  height: calc(16 * var(--u));
+  border-radius: calc(2.2 * var(--u));
+  background: #fff;
+  transform: rotate(45deg);
+}
+
+.frame-edge--top,
+.frame-edge--bottom {
+  left: calc(var(--corner) + 120 * var(--u));
+  right: calc(var(--corner) + 120 * var(--u));
+  height: calc(22 * var(--u));
+  background-size:
+    calc(100% - 21.5 * var(--u)) max(1.25px, calc(3 * var(--u))),
+    calc(100% - 21.5 * var(--u)) max(1px, var(--u));
+}
+
+.frame-edge--top { top: calc(4.3 * var(--u)); }
+.frame-edge--bottom { bottom: calc(4.3 * var(--u)); }
+
+.frame-edge--top {
+  background-position:
+    calc(10.75 * var(--u)) calc(9.243 * var(--u)),
+    calc(10.75 * var(--u)) calc(16.243 * var(--u));
+}
+
+.frame-edge--bottom {
+  background-position:
+    calc(10.75 * var(--u)) calc(9.757 * var(--u)),
+    calc(10.75 * var(--u)) calc(4.757 * var(--u));
+}
+
+.frame-edge--top::before,
+.frame-edge--bottom::before { left: calc(2.75 * var(--u)); top: calc(2.75 * var(--u)); }
+.frame-edge--top::after,
+.frame-edge--bottom::after { right: calc(2.75 * var(--u)); top: calc(2.75 * var(--u)); }
+
+.frame-edge--left,
+.frame-edge--right {
+  top: calc(var(--corner) + 156 * var(--u));
+  bottom: calc(var(--corner) + 156 * var(--u));
+  width: calc(22 * var(--u));
+  background-size:
+    max(1.25px, calc(3 * var(--u))) calc(100% - 21.5 * var(--u)),
+    max(1px, var(--u)) calc(100% - 21.5 * var(--u));
+}
+
+.frame-edge--left { left: calc(4.5 * var(--u)); }
+.frame-edge--right { right: calc(4.5 * var(--u)); }
+
+.frame-edge--left {
+  background-position:
+    calc(9.243 * var(--u)) calc(10.75 * var(--u)),
+    calc(16.243 * var(--u)) calc(10.75 * var(--u));
+}
+
+.frame-edge--right {
+  background-position:
+    calc(9.757 * var(--u)) calc(10.75 * var(--u)),
+    calc(4.757 * var(--u)) calc(10.75 * var(--u));
+}
+
+.frame-edge--left::before,
+.frame-edge--right::before { left: calc(2.75 * var(--u)); top: calc(2.75 * var(--u)); }
+.frame-edge--left::after,
+.frame-edge--right::after { left: calc(2.75 * var(--u)); bottom: calc(2.75 * var(--u)); }
+
+/* Too short for the side segments to fit between the corners. */
+@media (max-height: 560px) {
+  .frame-edge--left,
+  .frame-edge--right { display: none; }
+}
+
 /* ---------- Top bar ----------
    Positioned as a transparent overlay above the stage (not squeezing it
    into a shorter box) so petals thrown upward stay visible passing behind
-   it. The bar itself lets clicks through; only the actual button shapes
-   (re-enabled below) stay on top and clickable, keeping petals visually
-   and functionally behind the buttons themselves. */
+   it. It sits inside the frame, inset from the corner brackets; the bar
+   itself lets clicks through, and only the real buttons (re-enabled below)
+   stay on top and clickable. */
 
 .topbar {
   position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
+  top: calc(var(--frame-inset) + 70 * var(--u));
+  left: calc(var(--frame-inset) + 64 * var(--u));
+  right: calc(var(--frame-inset) + 64 * var(--u));
   z-index: 10;
   pointer-events: none;
   display: flex;
   align-items: center;
-  justify-content: space-around;
-  gap: 16px;
-  padding: 14px 20px;
-  flex-wrap: wrap;
-}
-
-/* Carved-wood hex buttons: an SVG hexagon sits behind the label as a
-   plain background layer, so the exact vector artwork stays crisp at any
-   size. The shadow is deliberately NOT baked into the SVG (an SVG filter's
-   own bounding-box math shifts against preserveAspectRatio="none"
-   stretching, throwing the shape out of alignment with the label on top
-   of it) — it's a plain CSS drop-shadow instead, applied in screen space
-   after layout, so it can never desync from the text. */
-
-.btn-label {
-  position: relative;
-  z-index: 2;
-  font-family: "Berkshire Swash", "Caveat", cursive, serif;
-  color: #ffffff;
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
-  white-space: nowrap;
-  pointer-events: none;
-}
-
-.wood-hex {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  display: block;
-  pointer-events: none;
-  filter: drop-shadow(0 4px 4px rgba(0, 0, 0, 0.25));
+  justify-content: space-between;
 }
 
 .gender-selector {
+  --gender-w: 60px;
+  --gender-h: 46px;
+
   position: relative;
   display: inline-flex;
   pointer-events: auto;
 }
 
-.wood-track {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  z-index: 0;
-  pointer-events: none;
-}
-
-/* One shared hex that slides (with a bounce) to whichever option is
+/* One shared highlight that slides (with a bounce) to whichever option is
    active, instead of each button crossfading its own copy in place. */
-.gender-active-hex {
-  z-index: 1;
+.gender-active-pill {
+  position: absolute;
   top: 0;
   left: 0;
-  right: auto;
-  bottom: auto;
-  width: 128px;
-  height: 48px;
+  width: var(--gender-w);
+  height: var(--gender-h);
+  border-radius: 6px;
+  background: var(--pill-active);
   transition: transform 550ms cubic-bezier(0.34, 1.56, 0.64, 1);
+  z-index: 0;
 }
 
 .gender-btn {
   position: relative;
-  z-index: 2;
-  width: 128px;
-  height: 48px;
+  z-index: 1;
+  width: var(--gender-w);
+  height: var(--gender-h);
   display: inline-flex;
   align-items: center;
   justify-content: center;
   border: none;
   background: transparent;
+  color: #fff;
   cursor: pointer;
   padding: 0;
   transition: transform 150ms ease;
+  -webkit-tap-highlight-color: transparent;
 }
 
-.gender-btn .btn-label { font-size: 17px; }
-
 .gender-btn:hover:not(.active) { transform: translateY(-1px); }
-.gender-btn:active { transform: scale(0.96); }
+.gender-btn:active { transform: scale(0.94); }
 
 .topbar-right {
   display: inline-flex;
   align-items: center;
-  gap: 10px;
+  gap: 6px;
   pointer-events: auto;
 }
 
 .icon-btn {
   position: relative;
-  width: 83px;
-  height: 48px;
+  width: 46px;
+  height: 46px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   border: none;
+  border-radius: 8px;
   background: transparent;
+  color: #fff;
   cursor: pointer;
   padding: 0;
-  transition: transform 150ms ease;
+  transition: transform 150ms ease, opacity 250ms ease;
+  -webkit-tap-highlight-color: transparent;
 }
 
-.icon-btn .wood-hex { transition: opacity 250ms ease; }
-.icon-btn.is-muted .wood-hex { opacity: 0.4; }
+.icon-btn:hover { transform: translateY(-1px); }
+.icon-btn:active { transform: scale(0.92); }
+.icon-btn.is-muted { opacity: 0.7; }
 
-.icon-btn .icon-unmuted,
-.icon-btn .icon-muted {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  z-index: 1;
+.gender-icon,
+.icon-btn svg {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
   pointer-events: none;
 }
+
+.gender-icon { width: 26px; height: 26px; }
+.icon-btn svg { width: 30px; height: 30px; }
+
+.icon-btn .speaker-body { fill: currentColor; }
 
 .icon-muted { display: none; }
 .icon-btn.is-muted .icon-unmuted { display: none; }
 .icon-btn.is-muted .icon-muted { display: block; }
 
-.icon-btn:hover { transform: translateY(-1px); }
-.icon-btn:active { transform: scale(0.94); }
-
-.primary-btn {
-  position: relative;
-  width: 203px;
-  height: 48px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border: none;
-  background: transparent;
-  cursor: pointer;
-  padding: 0;
-  transition: transform 150ms ease;
+.gender-btn:focus-visible,
+.icon-btn:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.9);
+  outline-offset: 2px;
 }
 
-.primary-btn .btn-label { font-size: 16px; }
-
-.primary-btn:hover { transform: translateY(-1px); }
-.primary-btn:active { transform: scale(0.96); }
-
 @media (max-width: 640px) {
-  .gender-selector { transform: scale(0.82); transform-origin: left center; }
-  .topbar-right { transform: scale(0.82); transform-origin: right center; }
+  .gender-selector { --gender-w: 52px; --gender-h: 44px; }
+  .icon-btn { width: 44px; height: 44px; }
+  .gender-icon { width: 24px; height: 24px; }
+  .icon-btn svg { width: 28px; height: 28px; }
 
   /* dvh accounts for mobile browser chrome (address/tab bars) shrinking
      and growing the viewport, so the page never becomes tall enough to
      scroll as that chrome shows or hides. */
   html, body { overflow: hidden; }
   #app { height: 100dvh; }
-}
-
-@media (max-width: 420px) {
-  .topbar { justify-content: center; }
-  .gender-selector { transform: scale(0.72); transform-origin: center; }
-  .topbar-right { transform: scale(0.72); transform-origin: center; }
 }
 
 /* ---------- Stage ---------- */
@@ -244,8 +353,7 @@ body::before {
      silently fails to render filter: drop-shadow() on SVG elements that
      sit inside transformed ancestor groups — confirmed missing on iPhone
      even though it renders fine on desktop. A filter directly on a
-     top-level <svg> (no SVG ancestor) is unaffected, matching how the
-     .wood-hex buttons already render their shadow correctly everywhere.
+     top-level <svg> (no SVG ancestor) is unaffected.
      This is a soft ambient shadow under the flower as a whole — it's the
      only one iOS can render, so it's kept light/diffuse on purpose. The
      per-petal shadows below are the "real" ones and still do the visible
@@ -533,9 +641,11 @@ body::before {
 .hint.hidden { opacity: 0; }
 
 /* ---------- End screen ----------
-   A hanging wooden sign that drops the verdict once the flower is bare.
-   Sits above the flower/message layer but below the topbar (z-index),
-   so the nav buttons stay visible and clickable even while it's up. */
+   A tan panel carrying the same corner-bracket frame as the main screen,
+   with a white line heart beside the verdict, that drops in once the flower
+   is bare. Sits above the flower/message layer but below the topbar
+   (z-index), so the nav buttons stay visible and clickable even while it's
+   up. */
 
 .end-screen {
   position: absolute;
@@ -551,14 +661,21 @@ body::before {
   display: none;
 }
 
-.end-sign {
+.end-card {
   position: relative;
-  width: min(88vw, 560px);
-  aspect-ratio: 702 / 463;
-  animation: signDrop 900ms cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+  width: min(88vw, 620px);
+  aspect-ratio: 1.56;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  border: 1px solid rgba(120, 90, 70, 0.32);
+  background: linear-gradient(180deg, rgba(219, 198, 180, 0.95) 0%, rgba(171, 148, 132, 0.95) 100%);
+  box-shadow: 0 16px 34px rgba(60, 40, 30, 0.28);
+  animation: cardDrop 900ms cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
 }
 
-@keyframes signDrop {
+@keyframes cardDrop {
   0% { transform: translateY(-130vh) rotate(-7deg); opacity: 0; }
   50% { opacity: 1; }
   72% { transform: translateY(16px) rotate(2.5deg); }
@@ -566,111 +683,100 @@ body::before {
   100% { transform: translateY(0) rotate(0deg); opacity: 1; }
 }
 
-/* Ropes are painted before (so they sit behind) the sign frame, and
-   their stack's bottom edge reaches a bit past the sign's top edge
-   (bottom: 93%, not 100%) — the frame graphic itself has a few percent
-   of transparent padding above its actual wood (room for its drop
-   shadow), so anchoring flush at 100% left a sliver of visible gap
-   before the wood started. Dipping in past that margin means the rope
-   is overlapped by solid wood, not just the shadow padding, so it
-   truly disappears behind the frame. Centered (translateX(-50%)) on
-   the frame artwork's own grommet-hole positions, not just a round
-   percentage, so it lines up with the dark circles exactly. */
-.end-rope {
+/* The same corner artwork as the main frame, sized so a corner is about
+   half the card's height — the two vertical arms on each side then just
+   meet in the middle, like in the main frame's side segments. */
+.end-card-frame {
   position: absolute;
-  bottom: 93%;
-  left: 12.61%;
-  transform: translateX(-50%);
-  width: clamp(8px, 1.6%, 13px);
-  display: flex;
-  flex-direction: column;
-  z-index: 0;
+  inset: 0;
+  pointer-events: none;
 }
 
-.end-rope-tile {
+.end-card-corner {
+  position: absolute;
   display: block;
-  width: 100%;
+  width: 32%;
   height: auto;
-  aspect-ratio: 13 / 350;
-  flex: none;
+  aspect-ratio: 218 / 216;
 }
 
-.end-rope--right { left: 87.96%; }
+.end-card-corner--br { right: 2.2%; bottom: 3.4%; }
+.end-card-corner--bl { left: 2.2%; bottom: 3.4%; transform: scaleX(-1); }
+.end-card-corner--tr { right: 2.2%; top: 3.4%; transform: scaleY(-1); }
+.end-card-corner--tl { left: 2.2%; top: 3.4%; transform: scale(-1, -1); }
 
-.end-sign-frame {
+.end-card-body {
   position: relative;
-  z-index: 1;
-  width: 100%;
-  height: 100%;
-  display: block;
-}
-
-.end-sign-content {
-  position: absolute;
-  z-index: 2;
-  inset: 21% 9% 11%;
   display: flex;
   flex-direction: column;
   align-items: center;
+  gap: 10px;
+  max-width: 78%;
+}
+
+.end-card-row {
+  display: flex;
+  align-items: center;
   justify-content: center;
-  gap: 2.5%;
+  gap: clamp(8px, 2.4vw, 18px);
 }
 
 .end-sign-icon {
-  width: 22%;
+  flex: none;
+  width: clamp(52px, 13vw, 92px);
   height: auto;
   display: none;
+  color: #fff;
 }
 
 .end-screen.outcome-yes .end-sign-icon--happy { display: block; }
 .end-screen.outcome-no .end-sign-icon--sad { display: block; }
 
+.end-card-copy {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
 .end-sign-text {
   margin: 0;
-  font-family: "Berkshire Swash", "Caveat", cursive, serif;
-  color: #543b1c;
-  font-size: clamp(20px, 4.4vw, 32px);
-  text-align: center;
-  line-height: 1.2;
+  font-family: "Caveat", "Segoe Script", "Bradley Hand", cursive;
+  font-weight: 700;
+  color: #fff;
+  font-size: clamp(28px, 7.4vw, 50px);
+  line-height: 1.05;
+  text-shadow: 0 1px 4px rgba(90, 60, 40, 0.25);
 }
 
 /* A little nudge, only on the "loves me" outcome — one of a few random
    lines, so it doesn't repeat the same way every win. */
 .end-sign-subtext {
-  margin: 0;
+  margin: 2px 0 0;
   display: none;
   font-family: "Caveat", "Segoe Script", "Bradley Hand", cursive;
   font-weight: 600;
-  color: #725531;
-  font-size: clamp(15px, 2.6vw, 20px);
-  text-align: center;
+  color: rgba(255, 255, 255, 0.88);
+  font-size: clamp(18px, 4.2vw, 26px);
 }
 
 .end-screen.outcome-yes .end-sign-subtext { display: block; }
 
 .end-sign-retry {
-  position: relative;
   display: none;
-  width: 132px;
-  height: 46px;
   align-items: center;
   justify-content: center;
-  border: none;
-  background: transparent;
+  padding: 8px 24px;
+  border: 1.5px solid rgba(255, 255, 255, 0.8);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.2);
+  color: #fff;
+  font: 600 15px/1 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   cursor: pointer;
-  padding: 0;
-  margin-top: 2%;
-  transition: transform 150ms ease;
+  transition: transform 150ms ease, background 150ms ease;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .end-screen.outcome-no .end-sign-retry { display: inline-flex; }
 
-.end-sign-retry .btn-label { font-size: 15px; }
-.end-sign-retry:hover { transform: translateY(-1px); }
+.end-sign-retry:hover { transform: translateY(-1px); background: rgba(255, 255, 255, 0.3); }
 .end-sign-retry:active { transform: scale(0.96); }
-
-@media (max-width: 520px) {
-  .topbar { padding: 12px 14px; }
-  .gender-btn { padding: 7px 12px; font-size: 13px; }
-  .primary-btn { padding: 9px 16px; font-size: 13px; }
-}
