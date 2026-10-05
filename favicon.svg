@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <defs>
+    <path id="petal" d="M0 0C-10 -9 -9 -20 0 -28C9 -20 10 -9 0 0Z"/>
+  </defs>
+  <g transform="translate(32 32) scale(1.08)" fill="#fffdf8" stroke="#d6c9b6" stroke-width="0.9" stroke-linejoin="round">
+    <use href="#petal"/>
+    <use href="#petal" transform="rotate(36)"/>
+    <use href="#petal" transform="rotate(72)"/>
+    <use href="#petal" transform="rotate(108)"/>
+    <use href="#petal" transform="rotate(144)"/>
+    <use href="#petal" transform="rotate(180)"/>
+    <use href="#petal" transform="rotate(216)"/>
+    <use href="#petal" transform="rotate(252)"/>
+    <use href="#petal" transform="rotate(288)"/>
+    <use href="#petal" transform="rotate(324)"/>
+    <circle r="9.5" fill="#ffbc81" stroke="none"/>
+  </g>
+</svg>
