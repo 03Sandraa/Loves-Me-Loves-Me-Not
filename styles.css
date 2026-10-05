@@ -665,13 +665,18 @@ body::before {
   position: relative;
   width: min(88vw, 620px);
   aspect-ratio: 1.56;
+  min-height: 0;
   display: flex;
   align-items: center;
   justify-content: center;
   border-radius: 10px;
-  border: 1px solid rgba(120, 90, 70, 0.32);
+  /* The hairline edge is an inset shadow, not a border: a real border would
+     make the frame's percentage offsets (see .end-card-corner) measure
+     against a box 2px smaller than the card and shift the joint. */
   background: linear-gradient(180deg, rgba(219, 198, 180, 0.95) 0%, rgba(171, 148, 132, 0.95) 100%);
-  box-shadow: 0 16px 34px rgba(60, 40, 30, 0.28);
+  box-shadow:
+    inset 0 0 0 1px rgba(120, 90, 70, 0.32),
+    0 16px 34px rgba(60, 40, 30, 0.28);
   animation: cardDrop 900ms cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
 }
 
@@ -683,9 +688,14 @@ body::before {
   100% { transform: translateY(0) rotate(0deg); opacity: 1; }
 }
 
-/* The same corner artwork as the main frame, sized so a corner is about
-   half the card's height — the two vertical arms on each side then just
-   meet in the middle, like in the main frame's side segments. */
+/* The same corner artwork as the main frame. The numbers are not eyeballed:
+   with the card at a 1.56 aspect ratio, a corner exactly half the card's
+   height wide makes one artwork unit (u) = height / 436, and an 11u margin
+   from the top and bottom edge puts the top and bottom corners 198u apart —
+   the distance at which the end diamonds of their vertical arms land on
+   exactly the same point, so the two arms join into one continuous line
+   with a single diamond where they meet. If the card's aspect ratio or
+   these offsets change, that joint stops lining up. */
 .end-card-frame {
   position: absolute;
   inset: 0;
@@ -695,15 +705,15 @@ body::before {
 .end-card-corner {
   position: absolute;
   display: block;
-  width: 32%;
+  width: 32.0513%;
   height: auto;
   aspect-ratio: 218 / 216;
 }
 
-.end-card-corner--br { right: 2.2%; bottom: 3.4%; }
-.end-card-corner--bl { left: 2.2%; bottom: 3.4%; transform: scaleX(-1); }
-.end-card-corner--tr { right: 2.2%; top: 3.4%; transform: scaleY(-1); }
-.end-card-corner--tl { left: 2.2%; top: 3.4%; transform: scale(-1, -1); }
+.end-card-corner--br { right: 1.62%; bottom: 2.523%; }
+.end-card-corner--bl { left: 1.62%; bottom: 2.523%; transform: scaleX(-1); }
+.end-card-corner--tr { right: 1.62%; top: 2.523%; transform: scaleY(-1); }
+.end-card-corner--tl { left: 1.62%; top: 2.523%; transform: scale(-1, -1); }
 
 .end-card-body {
   position: relative;
@@ -711,7 +721,7 @@ body::before {
   flex-direction: column;
   align-items: center;
   gap: 10px;
-  max-width: 78%;
+  max-width: 83%;
 }
 
 .end-card-row {
@@ -728,6 +738,27 @@ body::before {
   display: none;
   color: #fff;
 }
+
+/* Only the happy heart floats — the broken one stays put. It starts once
+   the card has landed (its drop takes 900ms) and then drifts up and down
+   forever, about 14px of travel at most. */
+.end-sign-icon--happy {
+  animation: heartFloat 4s ease-in-out 900ms infinite alternate;
+}
+
+@keyframes heartFloat {
+  from { transform: translateY(0) rotate(0deg); }
+  to { transform: translateY(-14px) rotate(2.5deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .end-sign-icon--happy { animation: none; }
+}
+
+/* The broken heart's drawing spends a third of its width on the little
+   dizzy face beside the heart, so at the same box width its heart reads
+   much smaller than the happy one — it gets a wider box to even them out. */
+.end-sign-icon--sad { width: clamp(70px, 17.5vw, 124px); }
 
 .end-screen.outcome-yes .end-sign-icon--happy { display: block; }
 .end-screen.outcome-no .end-sign-icon--sad { display: block; }
@@ -765,6 +796,8 @@ body::before {
   display: none;
   align-items: center;
   justify-content: center;
+  align-self: center;
+  margin-top: 8px;
   padding: 8px 24px;
   border: 1.5px solid rgba(255, 255, 255, 0.8);
   border-radius: 999px;
